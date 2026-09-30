@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Skjul scrollbar men behold scroll-funksjon */
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+
+@layer base {
+  :root {
+    --tideron-navy: #0F2A5A;
+    --tideron-blue: #1B4F8A;
+    --tideron-teal: #0D9488;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-[#0F2A5A] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1B4F8A] transition-colors;
+  }
+  .btn-secondary {
+    @apply border border-slate-200 bg-white text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors;
+  }
+  .card {
+    @apply bg-white border border-slate-200 rounded-xl shadow-sm;
+  }
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+}

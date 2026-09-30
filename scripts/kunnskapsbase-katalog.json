@@ -1,0 +1,23 @@
+{
+  "Tideron_Enkel_Innforing.pdf": { "audience": "customer", "category": "intro" },
+  "Tideron - Insight Product Portfolio - Ver 1.1.docx": { "audience": "customer", "category": "produkt" },
+  "Tideron RotorDrone Product Sheet and Solution Description Ver 2.2.docx": { "audience": "customer", "category": "produkt" },
+  "Waterotor_GTM_Plan.docx": { "audience": "internal", "category": "strategi" },
+  "Tideron_Lokalitetsregister_GPS_2026.md": { "audience": "internal", "category": "lokasjoner" },
+  "Tideron_Norske_Locations_kW_Estimater_2026-06-15.xlsx": { "audience": "internal", "category": "lokasjoner" },
+  "Tideron_Topp50_Tidevannslokasjoner_2026-07-31.xlsx": { "audience": "internal", "category": "lokasjoner" },
+  "Datarom_SPV_struktur.md": { "audience": "internal", "category": "selskapsstruktur" },
+  "bedriftsliste_vannressurser.md": { "audience": "internal", "category": "kunder" },
+  "Faroe Islands Outreach Emails.md": { "audience": "internal", "category": "salg" },
+  "Svalbard og Skien Status og LCOE Analyse.docx": { "audience": "internal", "category": "okonomi" },
+  "Tideron Høringssvar Longyearbyen 2026.docx": { "audience": "customer", "category": "regulatorisk" },
+  "Oversikt stotteordninger Skien.docx": { "audience": "customer", "category": "stotteordninger" },
+  "Rapport_Kraftsituasjon_Kongsberg_Grenland.pdf": { "audience": "customer", "category": "marked" },
+  "Norges_raskeste_elver.md": { "audience": "customer", "category": "teknologi" },
+  "Sognefjorden_strømforhold.md": { "audience": "internal", "category": "lokasjoner" },
+  "Lokalitetsanalyse_Saltstraumen_Tjeldsundet_Sjoa_Tailrace_2026.md": { "audience": "internal", "category": "lokasjoner" },
+  "Waterotor_Betalingsmodell_Skatteanalyse.docx": { "audience": "internal", "category": "okonomi" },
+  "Tideron Totaloppsummering (prosjektbeskrivelse).txt": { "audience": "internal", "category": "strategi" },
+  "Ukesoppdatering 2026-08-14 (energipolitikk).txt": { "audience": "customer", "category": "marked" },
+  "Waterotor EngineeringSummary 20241018.txt": { "audience": "customer", "category": "teknologi" }
+}
