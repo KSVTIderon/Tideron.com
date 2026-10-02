@@ -71,7 +71,7 @@ interface Props {
   height?: string;
 }
 
-type Kartlag = "standard" | "sjokart" | "dybde" | "satellitt";
+type Kartlag = "standard" | "sjokart" | "dybde" | "satellitt" | "havstrom";
 
 function getSavedView(key: string) {
   try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : null; } catch { return null; }
@@ -156,6 +156,17 @@ function applyKartlag(
       attribution: "Kartverket", opacity: 1.0,
     }));
 
+  } else if (kartlag === "havstrom") {
+    // Satellitt som base
+    tileRef.current = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { attribution: "Esri, Maxar, Earthstar Geographics", maxZoom: 19 }
+    ).addTo(map);
+    // CMEMS havstrøm-overlay (proxied via vår API)
+    addO(L.tileLayer(
+      "/planner/api/havstrom-tile?z={z}&x={x}&y={y}",
+      { opacity: 0.65, maxZoom: 14, tileSize: 256, attribution: "© CMEMS" }
+    ));
   } else {
     // Satellitt — Esri World Imagery (global)
     tileRef.current = L.tileLayer(
@@ -1226,8 +1237,8 @@ export default function ProsjektKartMap({
   const KNAPPER: { k: Kartlag; label: string }[] = [
     { k: "standard",  label: "Kart" },
     { k: "sjokart",   label: "Dybdedata" },
-    { k: "dybde",     label: "Dybde (m)" },
     { k: "satellitt", label: "Satellitt" },
+    { k: "havstrom",  label: "🌊 Havstrøm" },
   ];
 
   return (
@@ -1252,6 +1263,40 @@ export default function ProsjektKartMap({
             </button>
           ))}
         </div>
+
+        {/* Havstrøm fargeskala-forklaring */}
+        {kartlag === "havstrom" && (
+          <div style={{
+            position: "absolute", bottom: 36, right: 10, zIndex: 1000,
+            background: "rgba(10,31,69,.92)", borderRadius: 8, padding: "8px 10px",
+            boxShadow: "0 2px 12px rgba(0,0,0,.4)", border: "1px solid rgba(255,255,255,.12)",
+            minWidth: 130,
+          }}>
+            <div style={{ color: "rgba(255,255,255,.6)", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", marginBottom: 2, textTransform: "uppercase" }}>
+              Strømhastighet
+            </div>
+            <div style={{ color: "rgba(255,255,255,.4)", fontSize: 8, marginBottom: 5 }}>mnd.snitt (CMEMS)</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+              <div style={{ width: 12, height: 10, borderRadius: 2, background: "#FF0000", flexShrink: 0 }} />
+              <span style={{ fontSize: 9, color: "#FF4444", fontWeight: 700 }}>&gt; 1.5 m/s</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "stretch", gap: 6 }}>
+              <div style={{
+                width: 12, borderRadius: 3,
+                background: "linear-gradient(to top, #1a7a3c, #78c441, #ffdd00, #ff8800, #cc0000)",
+                flexShrink: 0,
+              }} />
+              <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,.7)", lineHeight: 1 }}>
+                <span>1.5 m/s</span>
+                <span>1.0 m/s</span>
+                <span>0.75 m/s</span>
+                <span>0.4 m/s</span>
+                <span>0 m/s</span>
+              </div>
+            </div>
+            <div style={{ color: "rgba(255,255,255,.35)", fontSize: 8, marginTop: 5 }}>© CMEMS</div>
+          </div>
+        )}
 
         {/* Solcelle polygon-kontroller */}
         {solcelleModus && (
