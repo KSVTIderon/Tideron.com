@@ -1291,68 +1291,108 @@ export default function BudsjettPage({ params }: { params: { id: string } }) {
   });
 
   const pid = params.id;
-  const LS_KEYS: Record<string, string> = {
-    ppaKr:              `${pid}:rapport_ppa`,
-    ingKr:              `${pid}:budsjett_ing_kr`,
-    installKr:          `${pid}:budsjett_install_kr`,
-    levetid:            `${pid}:budsjett_levetid`,
-    containerBasispris: `${pid}:budsjett_container`,
-    solCapexKrKwp:      `${pid}:budsjett_sol_capex_kwp`,
-    solPeakTimer:       `${pid}:budsjett_sol_peak_timer`,
-    cp:                 `${pid}:budsjett_cp`,
-  };
   const LS_KEY_SENSORER = `${pid}:budsjett_sensorer`;
 
-  // Les localStorage etter mount (SSR-trygt) — per-prosjekt nøkler
+  const CONF_DEFAULTS = {
+    ppaKr: 0.65, ingKr: 120000, installKr: 200000, levetid: 30,
+    containerBasispris: 80000, solCapexKrKwp: 12000, solPeakTimer: 950, cp: CP_WATEROTOR,
+  };
+
+  // ── Last budsjett_config fra databasen (deles mellom alle brukere) ──
   useEffect(() => {
-    const g = (k: string) => parseFloat(localStorage.getItem(k) ?? "");
-    const ppaKr             = g(LS_KEYS.ppaKr);
-    const ingKr             = g(LS_KEYS.ingKr);
-    const installKr         = g(LS_KEYS.installKr);
-    const levetid           = g(LS_KEYS.levetid);
-    const containerBasispris= g(LS_KEYS.containerBasispris);
-    const solCapexKrKwp     = g(LS_KEYS.solCapexKrKwp);
-    const solPeakTimer      = g(LS_KEYS.solPeakTimer);
-    const cp                = g(LS_KEYS.cp);
-    setConf({
-      ppaKr:              isNaN(ppaKr)              ? 0.65         : ppaKr,
-      ingKr:              isNaN(ingKr)              ? 120000       : ingKr,
-      installKr:          isNaN(installKr)          ? 200000       : installKr,
-      levetid:            isNaN(levetid)            ? 30           : levetid,
-      containerBasispris: isNaN(containerBasispris) ? 80000        : containerBasispris,
-      solCapexKrKwp:      isNaN(solCapexKrKwp)      ? 12000        : solCapexKrKwp,
-      solPeakTimer:       isNaN(solPeakTimer)       ? 950          : solPeakTimer,
-      cp:                 isNaN(cp)                 ? CP_WATEROTOR : cp,
-    });
-    // Last sensorkostnader — slå sammen lagrede verdier med standardlisten (nye sensorer legges til)
-    try {
-      const lagret = localStorage.getItem(LS_KEY_SENSORER);
-      if (lagret) {
-        const lagretMap: Record<string, Partial<SensorKostnad>> = {};
-        (JSON.parse(lagret) as SensorKostnad[]).forEach(s => { lagretMap[s.kode] = s; });
-        setSensorKostnader(SENSOR_DEFAULTS.map(d => ({
-          ...d,
-          ...(lagretMap[d.kode] ? { pris: lagretMap[d.kode].pris ?? d.pris, aktiv: lagretMap[d.kode].aktiv ?? d.aktiv } : {}),
-        })));
-      }
-    } catch { /* ignore */ }
+    sb.from("projects")
+      .select("budsjett_config")
+      .eq("id", pid)
+      .single()
+      .then(({ data }) => {
+        const cfg = data?.budsjett_config ?? {};
+        const n = (k: string, def: number) => (typeof cfg[k] === "number" ? cfg[k] : def);
+        setConf({
+          ppaKr:              n("ppaKr",              CONF_DEFAULTS.ppaKr),
+          ingKr:              n("ingKr",              CONF_DEFAULTS.ingKr),
+          installKr:          n("installKr",          CONF_DEFAULTS.installKr),
+          levetid:            n("levetid",            CONF_DEFAULTS.levetid),
+          containerBasispris: n("containerBasispris", CONF_DEFAULTS.containerBasispris),
+          solCapexKrKwp:      n("solCapexKrKwp",      CONF_DEFAULTS.solCapexKrKwp),
+          solPeakTimer:       n("solPeakTimer",       CONF_DEFAULTS.solPeakTimer),
+          cp:                 n("cp",                 CONF_DEFAULTS.cp),
+        });
+        // Last sensorkostnader fra db-config om de finnes, ellers localStorage
+        if (cfg.sensorKostnader) {
+          const lagretMap: Record<string, Partial<SensorKostnad>> = {};
+          (cfg.sensorKostnader as SensorKostnad[]).forEach((s: SensorKostnad) => { lagretMap[s.kode] = s; });
+          setSensorKostnader(SENSOR_DEFAULTS.map(d => ({
+            ...d,
+            ...(lagretMap[d.kode] ? { pris: lagretMap[d.kode].pris ?? d.pris, aktiv: lagretMap[d.kode].aktiv ?? d.aktiv } : {}),
+          })));
+        } else {
+          try {
+            const lagret = localStorage.getItem(LS_KEY_SENSORER);
+            if (lagret) {
+              const lagretMap: Record<string, Partial<SensorKostnad>> = {};
+              (JSON.parse(lagret) as SensorKostnad[]).forEach(s => { lagretMap[s.kode] = s; });
+              setSensorKostnader(SENSOR_DEFAULTS.map(d => ({
+                ...d,
+                ...(lagretMap[d.kode] ? { pris: lagretMap[d.kode].pris ?? d.pris, aktiv: lagretMap[d.kode].aktiv ?? d.aktiv } : {}),
+              })));
+            }
+          } catch { /* ignore */ }
+        }
+      });
+  }, [pid]); // eslint-disable-line
+
+  // ── Realtime: oppdater conf når annen bruker endrer prosjektet ──
+  useEffect(() => {
+    const channel = sb
+      .channel(`budsjett-${pid}`)
+      .on("postgres_changes", {
+        event: "UPDATE",
+        schema: "public",
+        table: "projects",
+        filter: `id=eq.${pid}`,
+      }, (payload: any) => {
+        const cfg = payload.new?.budsjett_config ?? {};
+        const n = (k: string, def: number) => (typeof cfg[k] === "number" ? cfg[k] : def);
+        setConf(prev => ({
+          ppaKr:              n("ppaKr",              prev.ppaKr),
+          ingKr:              n("ingKr",              prev.ingKr),
+          installKr:          n("installKr",          prev.installKr),
+          levetid:            n("levetid",            prev.levetid),
+          containerBasispris: n("containerBasispris", prev.containerBasispris),
+          solCapexKrKwp:      n("solCapexKrKwp",      prev.solCapexKrKwp),
+          solPeakTimer:       n("solPeakTimer",       prev.solPeakTimer),
+          cp:                 n("cp",                 prev.cp),
+        }));
+      })
+      .subscribe();
+    return () => { sb.removeChannel(channel); };
+  }, [pid]); // eslint-disable-line
+
+  // ── Lagre conf til databasen (debounced 800ms) ──
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveConf = useCallback((newConf: typeof conf, newSensorer?: SensorKostnad[]) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      sb.from("projects").update({
+        budsjett_config: { ...newConf, ...(newSensorer ? { sensorKostnader: newSensorer } : {}) },
+      }).eq("id", pid);
+    }, 800);
   }, [pid]); // eslint-disable-line
 
   const oppdaterSensor = (kode: string, felt: "aktiv" | "pris", verdi: boolean | number) => {
     setSensorKostnader(prev => {
       const ny = prev.map(s => s.kode === kode ? { ...s, [felt]: verdi } : s);
-      if (typeof window !== "undefined") {
-        localStorage.setItem(LS_KEY_SENSORER, JSON.stringify(ny));
-      }
+      saveConf(conf, ny);
       return ny;
     });
   };
 
   const set = (k: string, v: number) => {
-    setConf(prev => ({ ...prev, [k]: v }));
-    if (typeof window !== "undefined" && LS_KEYS[k]) {
-      localStorage.setItem(LS_KEYS[k], String(v));
-    }
+    setConf(prev => {
+      const ny = { ...prev, [k]: v };
+      saveConf(ny);
+      return ny;
+    });
   };
 
   // ── PVGIS: hent toppsoltimer for prosjektlokasjonen ───────────────────────
