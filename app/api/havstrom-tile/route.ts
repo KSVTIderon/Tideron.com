@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
   wmtsUrl.searchParams.set("tilerow", y);
   wmtsUrl.searchParams.set("tilecol", x);
   wmtsUrl.searchParams.set("time", time);
-  wmtsUrl.searchParams.set("colorscalerange", "0,0.5"); // 0-0.5 m/s passer månedlig gjennomsnitt
+  wmtsUrl.searchParams.set("colorscalerange", "0,2.5"); // 0-2.5 m/s, grønt under 1, rødt ved 2.5
 
   let res: Response;
   try {
@@ -103,25 +103,31 @@ export async function GET(req: NextRequest) {
       if (d[i + 3] > 10) {
         const R = d[i], G = d[i + 1];
         // Estimer hastighet fra G/(R+G) forholdet
-        // RdYlGn: sakte(0)=RØD (R dominerer), rask(1)=GRØNN (G dominerer)
-        // ratio=G/(R+G): lav=sakte(rød), høy=rask(grønn)
+        // RdYlGn: sakte(0)=RØD(R dom.), rask(1)=GRØNN(G dom.)
+        // ratio=G/(R+G) ≈ speed/2.5: 0=sakte, 1=rask
         const ratio = G / (R + G + 1);
-        const t = ratio; // lineær: 0=sakte→grønt output, 1=rask→rødt output
 
-        // Map t til lyse farger
+        // Bruker ønsket: < 1 m/s (ratio < 0.40) = grønt, 1-2.5 m/s = gul→rød
+        const THRESHOLD = 0.40; // ≈ 1.0 m/s av 2.5 m/s skala
+
         let r: number, g: number, b: number;
-        if (t < 0.5) {
-          // Lys grønt → lys gult
-          const f = t * 2; // 0→1
-          r = Math.round(f * 255);
-          g = 210;
-          b = 0;
+        if (ratio < THRESHOLD) {
+          // Under 1 m/s: flat grønt
+          r = 0; g = 210; b = 0;
         } else {
-          // Lys gult → lys rødt
-          const f = (t - 0.5) * 2; // 0→1
-          r = 255;
-          g = Math.round((1 - f) * 210);
-          b = 0;
+          // 1.0 → 2.5 m/s: grønt → gult → rødt
+          const f = (ratio - THRESHOLD) / (1 - THRESHOLD); // 0→1
+          if (f < 0.5) {
+            // grønt → gult
+            r = Math.round(f * 2 * 255);
+            g = 210;
+            b = 0;
+          } else {
+            // gult → rødt
+            r = 255;
+            g = Math.round((1 - (f - 0.5) * 2) * 210);
+            b = 0;
+          }
         }
 
         d[i] = r;
@@ -136,7 +142,7 @@ export async function GET(req: NextRequest) {
         "Content-Type": "image/png",
         "Cache-Control": "no-store",
         "Access-Control-Allow-Origin": "*",
-        "X-Debug": "v10-RdYlGn-correct-direction-0.5ms",
+        "X-Debug": "v11-green-under-1ms-red-at-2.5ms",
       },
     });
   } catch (err) {

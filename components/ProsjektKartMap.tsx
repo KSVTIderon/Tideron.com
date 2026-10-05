@@ -164,7 +164,7 @@ function applyKartlag(
     ).addTo(map);
     // CMEMS havstrøm-overlay (fargeremapping grønt→gult→rødt skjer på serveren)
     addO(L.tileLayer(
-      "/planner/api/havstrom-tile?v=10&z={z}&x={x}&y={y}",
+      "/planner/api/havstrom-tile?v=11&z={z}&x={x}&y={y}",
       { opacity: 0.75, maxZoom: 14, tileSize: 256, attribution: "© CMEMS" }
     ));
   } else {
@@ -1278,19 +1278,19 @@ export default function ProsjektKartMap({
             <div style={{ color: "rgba(255,255,255,.4)", fontSize: 8, marginBottom: 5 }}>mnd.snitt (CMEMS)</div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
               <div style={{ width: 12, height: 10, borderRadius: 2, background: "#FF0000", flexShrink: 0 }} />
-              <span style={{ fontSize: 9, color: "#FF4444", fontWeight: 700 }}>&gt; 2.0 m/s</span>
+              <span style={{ fontSize: 9, color: "#FF4444", fontWeight: 700 }}>&gt; 2.5 m/s</span>
             </div>
             <div style={{ display: "flex", alignItems: "stretch", gap: 6 }}>
               <div style={{
                 width: 12, borderRadius: 3,
-                background: "linear-gradient(to top, #00FF00, #FFFF00, #FF0000)",
+                background: "linear-gradient(to top, #00D200, #00D200, #FFD200, #FF0000)",
                 flexShrink: 0,
               }} />
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,.7)", lineHeight: 1 }}>
-                <span>2.0 m/s</span>
+                <span>2.5 m/s</span>
+                <span>1.75 m/s</span>
                 <span>1.0 m/s</span>
                 <span>0.5 m/s</span>
-                <span>0.2 m/s</span>
                 <span>0 m/s</span>
               </div>
             </div>
