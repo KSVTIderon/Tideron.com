@@ -80,8 +80,8 @@ export async function GET(req: NextRequest) {
   wmtsUrl.searchParams.set("tilerow", y);
   wmtsUrl.searchParams.set("tilecol", x);
   wmtsUrl.searchParams.set("time", time);
-  wmtsUrl.searchParams.set("colorscalerange", "0,0.8");
-  wmtsUrl.searchParams.set("abovemaxcolor", "0xFFFFFF"); // >0.8 m/s = hvit → rød etter canvas-remap
+  wmtsUrl.searchParams.set("colorscalerange", "0,2.0");
+  wmtsUrl.searchParams.set("abovemaxcolor", "0xFFFFFF"); // >2.0 m/s = hvit → rød etter canvas-remap
 
   let res: Response;
   try {

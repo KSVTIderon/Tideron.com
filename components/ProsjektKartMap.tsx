@@ -181,10 +181,12 @@ function applyKartlag(
             const d = imageData.data;
             for (let i = 0; i < d.length; i += 4) {
               if (d[i + 3] > 10) { // bare synlige piksler (hav med data)
-                const v = d[i] / 255; // 0=sakte(svart), 1=rask(hvit)
-                d[i]     = Math.round(Math.min(v * 2, 1) * 255);           // R: 0→0, 0.5→255, 1→255
-                d[i + 1] = Math.round(Math.min((1 - v) * 2, 1) * 255);    // G: 0→255, 0.5→255, 1→0
-                d[i + 2] = 0;                                               // B: alltid 0
+                // Gammakorrigering (√): gjør kontrast synlig selv ved lave snitthastigheter
+                // 0.1 m/s → 22% rød, 0.5 m/s → 50% gul, 1.0 m/s → 71% oransje, 2.0 m/s → 100% rød
+                const v = Math.sqrt(d[i] / 255); // 0=sakte(svart), 1=rask(hvit)
+                d[i]     = Math.round(Math.min(v * 2, 1) * 255);           // R
+                d[i + 1] = Math.round(Math.min((1 - v) * 2, 1) * 255);    // G
+                d[i + 2] = 0;                                               // B
               }
             }
             ctx.putImageData(imageData, 0, 0);
@@ -1308,7 +1310,7 @@ export default function ProsjektKartMap({
             <div style={{ color: "rgba(255,255,255,.4)", fontSize: 8, marginBottom: 5 }}>mnd.snitt (CMEMS)</div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
               <div style={{ width: 12, height: 10, borderRadius: 2, background: "#FF0000", flexShrink: 0 }} />
-              <span style={{ fontSize: 9, color: "#FF4444", fontWeight: 700 }}>&gt; 0.8 m/s</span>
+              <span style={{ fontSize: 9, color: "#FF4444", fontWeight: 700 }}>&gt; 2.0 m/s</span>
             </div>
             <div style={{ display: "flex", alignItems: "stretch", gap: 6 }}>
               <div style={{
@@ -1317,9 +1319,9 @@ export default function ProsjektKartMap({
                 flexShrink: 0,
               }} />
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,.7)", lineHeight: 1 }}>
-                <span>0.8 m/s</span>
-                <span>0.6 m/s</span>
-                <span>0.4 m/s</span>
+                <span>2.0 m/s</span>
+                <span>1.0 m/s</span>
+                <span>0.5 m/s</span>
                 <span>0.2 m/s</span>
                 <span>0 m/s</span>
               </div>
