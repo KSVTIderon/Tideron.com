@@ -162,11 +162,41 @@ function applyKartlag(
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       { attribution: "Esri, Maxar, Earthstar Geographics", maxZoom: 19 }
     ).addTo(map);
-    // CMEMS havstrøm-overlay (proxied via vår API)
-    addO(L.tileLayer(
-      "/planner/api/havstrom-tile?z={z}&x={x}&y={y}",
-      { opacity: 0.65, maxZoom: 14, tileSize: 256, attribution: "© CMEMS" }
-    ));
+    // CMEMS havstrøm-overlay — canvas-basert grønt→gult→rødt fargekart
+    // Kilde: cmap:gray (svart=sakte, hvit=rask), remap til grønt→gult→rødt
+    const HavstromLayer = (L as any).GridLayer.extend({
+      createTile(coords: any, done: Function): HTMLCanvasElement {
+        const tile = document.createElement("canvas");
+        const size = (this as any).getTileSize();
+        tile.width = size.x;
+        tile.height = size.y;
+        tile.style.opacity = "0.75";
+        const img = new Image();
+        img.onload = () => {
+          const ctx = tile.getContext("2d");
+          if (!ctx) { done(null, tile); return; }
+          ctx.drawImage(img, 0, 0);
+          try {
+            const imageData = ctx.getImageData(0, 0, tile.width, tile.height);
+            const d = imageData.data;
+            for (let i = 0; i < d.length; i += 4) {
+              if (d[i + 3] > 10) { // bare synlige piksler (hav med data)
+                const v = d[i] / 255; // 0=sakte(svart), 1=rask(hvit)
+                d[i]     = Math.round(Math.min(v * 2, 1) * 255);           // R: 0→0, 0.5→255, 1→255
+                d[i + 1] = Math.round(Math.min((1 - v) * 2, 1) * 255);    // G: 0→255, 0.5→255, 1→0
+                d[i + 2] = 0;                                               // B: alltid 0
+              }
+            }
+            ctx.putImageData(imageData, 0, 0);
+          } catch { /* ignore canvas-taint-feil */ }
+          done(null, tile);
+        };
+        img.onerror = () => done(null, tile);
+        img.src = `/planner/api/havstrom-tile?z=${coords.z}&x=${coords.x}&y=${coords.y}`;
+        return tile;
+      }
+    });
+    addO(new HavstromLayer({ maxZoom: 14, tileSize: 256, attribution: "© CMEMS" }));
   } else {
     // Satellitt — Esri World Imagery (global)
     tileRef.current = L.tileLayer(
@@ -1277,13 +1307,13 @@ export default function ProsjektKartMap({
             </div>
             <div style={{ color: "rgba(255,255,255,.4)", fontSize: 8, marginBottom: 5 }}>mnd.snitt (CMEMS)</div>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-              <div style={{ width: 12, height: 10, borderRadius: 2, background: "#FFFF00", flexShrink: 0 }} />
-              <span style={{ fontSize: 9, color: "#FFFF44", fontWeight: 700 }}>&gt; 2.0 m/s</span>
+              <div style={{ width: 12, height: 10, borderRadius: 2, background: "#FF0000", flexShrink: 0 }} />
+              <span style={{ fontSize: 9, color: "#FF4444", fontWeight: 700 }}>&gt; 2.0 m/s</span>
             </div>
             <div style={{ display: "flex", alignItems: "stretch", gap: 6 }}>
               <div style={{
                 width: 12, borderRadius: 3,
-                background: "linear-gradient(to top, #0d0887, #6a00a8, #b12a90, #e16462, #fca636, #f0f921)",
+                background: "linear-gradient(to top, #00FF00, #FFFF00, #FF0000)",
                 flexShrink: 0,
               }} />
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", fontSize: 9, color: "rgba(255,255,255,.7)", lineHeight: 1 }}>

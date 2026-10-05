@@ -73,16 +73,15 @@ export async function GET(req: NextRequest) {
   wmtsUrl.searchParams.set("version", "1.0.0");
   wmtsUrl.searchParams.set("request", "GetTile");
   wmtsUrl.searchParams.set("layer", "GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy-cur_anfc_0.083deg_P1M-m_202406/sea_water_velocity");
-  wmtsUrl.searchParams.set("style", "cmap:plasma");
+  wmtsUrl.searchParams.set("style", "cmap:gray");       // svart=sakte, hvit=rask
   wmtsUrl.searchParams.set("format", "image/png");
   wmtsUrl.searchParams.set("tilematrixset", "EPSG:3857");
   wmtsUrl.searchParams.set("tilematrix", z);
   wmtsUrl.searchParams.set("tilerow", y);
   wmtsUrl.searchParams.set("tilecol", x);
   wmtsUrl.searchParams.set("time", time);
-  // plasma: mørk lilla=sakte → blå → oransje → gul=rask
   wmtsUrl.searchParams.set("colorscalerange", "0,2.0");
-  wmtsUrl.searchParams.set("abovemaxcolor", "0xFFFF00"); // >2.0 m/s = knallgul
+  wmtsUrl.searchParams.set("abovemaxcolor", "0xFFFFFF"); // >2.0 m/s = hvit → rød etter canvas-remap
 
   let res: Response;
   try {
