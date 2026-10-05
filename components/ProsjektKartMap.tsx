@@ -162,43 +162,11 @@ function applyKartlag(
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       { attribution: "Esri, Maxar, Earthstar Geographics", maxZoom: 19 }
     ).addTo(map);
-    // CMEMS havstrøm-overlay — canvas-basert grønt→gult→rødt fargekart
-    // Kilde: cmap:gray (svart=sakte, hvit=rask), remap til grønt→gult→rødt
-    const HavstromLayer = (L as any).GridLayer.extend({
-      createTile(coords: any, done: Function): HTMLCanvasElement {
-        const tile = document.createElement("canvas");
-        const size = (this as any).getTileSize();
-        tile.width = size.x;
-        tile.height = size.y;
-        tile.style.opacity = "0.75";
-        const img = new Image();
-        img.onload = () => {
-          const ctx = tile.getContext("2d");
-          if (!ctx) { done(null, tile); return; }
-          ctx.drawImage(img, 0, 0);
-          try {
-            const imageData = ctx.getImageData(0, 0, tile.width, tile.height);
-            const d = imageData.data;
-            for (let i = 0; i < d.length; i += 4) {
-              if (d[i + 3] > 10) { // bare synlige piksler (hav med data)
-                // Gammakorrigering (√): gjør kontrast synlig selv ved lave snitthastigheter
-                // 0.1 m/s → 22% rød, 0.5 m/s → 50% gul, 1.0 m/s → 71% oransje, 2.0 m/s → 100% rød
-                const v = Math.sqrt(d[i] / 255); // 0=sakte(svart), 1=rask(hvit)
-                d[i]     = Math.round(Math.min(v * 2, 1) * 255);           // R
-                d[i + 1] = Math.round(Math.min((1 - v) * 2, 1) * 255);    // G
-                d[i + 2] = 0;                                               // B
-              }
-            }
-            ctx.putImageData(imageData, 0, 0);
-          } catch { /* ignore canvas-taint-feil */ }
-          done(null, tile);
-        };
-        img.onerror = () => done(null, tile);
-        img.src = `/planner/api/havstrom-tile?z=${coords.z}&x=${coords.x}&y=${coords.y}`;
-        return tile;
-      }
-    });
-    addO(new HavstromLayer({ maxZoom: 14, tileSize: 256, attribution: "© CMEMS" }));
+    // CMEMS havstrøm-overlay (fargeremapping grønt→gult→rødt skjer på serveren)
+    addO(L.tileLayer(
+      "/planner/api/havstrom-tile?z={z}&x={x}&y={y}",
+      { opacity: 0.75, maxZoom: 14, tileSize: 256, attribution: "© CMEMS" }
+    ));
   } else {
     // Satellitt — Esri World Imagery (global)
     tileRef.current = L.tileLayer(
