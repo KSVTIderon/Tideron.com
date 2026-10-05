@@ -57,13 +57,14 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Autentisering mot CMEMS feilet", { status: 502 });
   }
 
-  // cmap:RdYlGn: 0 m/s=rød, 2 m/s=grønn — vi bytter R↔G server-side → grønt=sakte, rødt=rask
+  // cmap:gray: CMEMS sender grå piksler der hvit(255)=sakte, svart(0)=rask
+  // Vi konverterer server-side til grønt→gult→rødt med gamma-korreksjon
   const wmtsUrl = new URL("https://wmts.marine.copernicus.eu/teroWmts");
   wmtsUrl.searchParams.set("service", "WMTS");
   wmtsUrl.searchParams.set("version", "1.0.0");
   wmtsUrl.searchParams.set("request", "GetTile");
   wmtsUrl.searchParams.set("layer", "GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy-cur_anfc_0.083deg_P1M-m_202406/sea_water_velocity");
-  wmtsUrl.searchParams.set("style", "cmap:RdYlGn");
+  wmtsUrl.searchParams.set("style", "cmap:gray");
   wmtsUrl.searchParams.set("format", "image/png");
   wmtsUrl.searchParams.set("tilematrixset", "EPSG:3857");
   wmtsUrl.searchParams.set("tilematrix", z);
@@ -71,6 +72,8 @@ export async function GET(req: NextRequest) {
   wmtsUrl.searchParams.set("tilecol", x);
   wmtsUrl.searchParams.set("time", time);
   wmtsUrl.searchParams.set("colorscalerange", "0,2.0");
+
+  console.log(`[havstrom v6] Henter tile z=${z} x=${x} y=${y} tid=${time}`);
 
   let res: Response;
   try {
@@ -91,29 +94,63 @@ export async function GET(req: NextRequest) {
 
   const buffer = Buffer.from(await res.arrayBuffer());
 
-  // ── Bytt R↔G: RdYlGn gir rød=sakte, grønn=rask → etter bytte: grønt=sakte, rødt=rask ──
+  // ── Fargekart: grønt(sakte) → gult → rødt(rask) med gamma=0.5 for bedre kontrast ──
   try {
     const png = PNG.sync.read(buffer);
     const d = png.data;
+    let remapped = 0;
+
     for (let i = 0; i < d.length; i += 4) {
-      if (d[i + 3] > 10) {
-        const r = d[i];
-        d[i]     = d[i + 1]; // ny R = gammel G
-        d[i + 1] = r;         // ny G = gammel R
+      const alpha = d[i + 3];
+      if (alpha > 10) {
+        // CMEMS gray: hvit(255)=0 m/s(sakte), svart(0)=2 m/s(rask)
+        const gray = d[i]; // R=G=B for gråtoner
+        const speed = (255 - gray) / 255; // 0=sakte, 1=rask (normalisert)
+        const t = Math.sqrt(speed); // gamma 0.5: gir bedre kontrast ved lave hastigheter
+
+        let r: number, g: number, b: number;
+        if (t < 0.5) {
+          // Grønt → Gult
+          const f = t * 2; // 0→1
+          r = Math.round(f * 255);
+          g = Math.round(150 + f * 105); // 150→255
+          b = 0;
+        } else {
+          // Gult → Rødt
+          const f = (t - 0.5) * 2; // 0→1
+          r = 255;
+          g = Math.round((1 - f) * 255); // 255→0
+          b = 0;
+        }
+
+        d[i] = r;
+        d[i + 1] = g;
+        d[i + 2] = b;
+        // alpha beholdes
+        remapped++;
       }
     }
-    const remapped = PNG.sync.write(png);
-    return new NextResponse(remapped, {
+
+    console.log(`[havstrom v6] Remappet ${remapped} piksler`);
+    const out = PNG.sync.write(png);
+
+    return new NextResponse(out as unknown as BodyInit, {
       headers: {
         "Content-Type": "image/png",
-        "Cache-Control": "no-store",   // ingen cache — sikrer at nye tiles alltid hentes
+        "Cache-Control": "no-store",
         "Access-Control-Allow-Origin": "*",
+        "X-Debug": "v6-gray-gamma-green-yellow-red",
       },
     });
   } catch (err) {
-    console.error("PNG R↔G bytte feilet:", err);
-    return new NextResponse(buffer, {
-      headers: { "Content-Type": "image/png", "Cache-Control": "no-store" },
+    console.error("[havstrom v6] PNG-manipulasjon feilet:", err);
+    // Fallback: returner original CMEMS-tile uten fargekart
+    return new NextResponse(buffer as unknown as BodyInit, {
+      headers: {
+        "Content-Type": "image/png",
+        "Cache-Control": "no-store",
+        "X-Debug": "v6-fallback-raw",
+      },
     });
   }
 }
