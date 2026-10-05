@@ -34,10 +34,11 @@ async function getCmemsToken(username: string, password: string): Promise<string
 }
 
 // ── Fargekart: gråverdi → grønt→gult→rødt ──
-// cmap:gray fra CMEMS: 0 m/s = svart (0), 2 m/s = hvit (255)
-// Gamma-korrigering (√) gir god visuell kontrast selv ved lave snitthastigheter
+// CMEMS cmap:gray er INVERTERT: 0 m/s = hvit (255), 2 m/s = svart (0)
+// Derfor inverter vi: (255 - gray) → så sakte=grønt, rask=rødt
+// Gamma-korrigering (√) gir god visuell kontrast
 function grayToGreenRed(gray: number): [number, number, number] {
-  const v = Math.sqrt(gray / 255); // 0=sakte→grønt, 1=rask→rødt
+  const v = Math.sqrt((255 - gray) / 255); // 0 m/s(hvit255)→v=0→grønt, 2 m/s(svart0)→v=1→rødt
   const r = Math.round(Math.min(v * 2, 1) * 255);
   const g = Math.round(Math.min((1 - v) * 2, 1) * 255);
   return [r, g, 0];
