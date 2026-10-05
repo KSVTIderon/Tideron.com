@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
   wmtsUrl.searchParams.set("tilerow", y);
   wmtsUrl.searchParams.set("tilecol", x);
   wmtsUrl.searchParams.set("time", time);
-  wmtsUrl.searchParams.set("colorscalerange", "0,2.0");
+  wmtsUrl.searchParams.set("colorscalerange", "0,1.0"); // 0-1 m/s for månedlig gjennomsnitt
 
   console.log(`[havstrom v6] Henter tile z=${z} x=${x} y=${y} tid=${time}`);
 
