@@ -164,7 +164,7 @@ function applyKartlag(
     ).addTo(map);
     // CMEMS havstrøm-overlay (fargeremapping grønt→gult→rødt skjer på serveren)
     addO(L.tileLayer(
-      "/planner/api/havstrom-tile?v=8&z={z}&x={x}&y={y}",
+      "/planner/api/havstrom-tile?v=9&z={z}&x={x}&y={y}",
       { opacity: 0.75, maxZoom: 14, tileSize: 256, attribution: "© CMEMS" }
     ));
   } else {

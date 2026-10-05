@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PNG } from "pngjs";
 
 export const runtime = "nodejs";
 
@@ -56,8 +57,8 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Autentisering mot CMEMS feilet", { status: 502 });
   }
 
-  // RdYlGn_r = reversed Red-Yellow-Green: 0 m/s → grønt, 1 m/s → rødt
-  // CMEMS gjør fargekartet selv — ingen pixel-manipulasjon nødvendig
+  // RdYlGn_r: 0 m/s=mørkt grønn, ~0.5=gul, 1 m/s=mørkt rød
+  // Vi bruker pngjs til å booste til lyse farger: grønt→gult→rødt
   const wmtsUrl = new URL("https://wmts.marine.copernicus.eu/teroWmts");
   wmtsUrl.searchParams.set("service", "WMTS");
   wmtsUrl.searchParams.set("version", "1.0.0");
@@ -71,8 +72,6 @@ export async function GET(req: NextRequest) {
   wmtsUrl.searchParams.set("tilecol", x);
   wmtsUrl.searchParams.set("time", time);
   wmtsUrl.searchParams.set("colorscalerange", "0,1.0");
-
-  console.log(`[havstrom v8] RdYlGn_r 0-1m/s: z=${z} x=${x} y=${y}`);
 
   let res: Response;
   try {
@@ -93,12 +92,60 @@ export async function GET(req: NextRequest) {
 
   const buffer = Buffer.from(await res.arrayBuffer());
 
-  return new NextResponse(buffer as unknown as BodyInit, {
-    headers: {
-      "Content-Type": "image/png",
-      "Cache-Control": "no-store",
-      "Access-Control-Allow-Origin": "*",
-      "X-Debug": "v8-RdYlGn_r-no-pngjs",
-    },
-  });
+  // ── Fargeboosting: mørke RdYlGn_r-farger → lyse grønt/gult/rødt ──
+  // RdYlGn_r: slow=mørkt grønn(G>R), medium=lys gul(R≈G), fast=mørkt rød(R>G)
+  // Ratio = G/(R+G+1): ~1.0 for sakte, ~0.5 for medium, ~0.0 for rask
+  try {
+    const png = PNG.sync.read(buffer);
+    const d = png.data;
+
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] > 10) {
+        const R = d[i], G = d[i + 1];
+        // Estimer hastighet fra G/(R+G) forholdet
+        const ratio = G / (R + G + 1); // 1=sakte(grønn), 0=rask(rød)
+        const speed = 1 - ratio;        // 0=sakte, 1=rask
+        const t = Math.sqrt(speed);     // gamma 0.5 for bedre kontrast
+
+        // Map t til lyse farger
+        let r: number, g: number, b: number;
+        if (t < 0.5) {
+          // Lys grønt → lys gult
+          const f = t * 2; // 0→1
+          r = Math.round(f * 255);
+          g = 210;
+          b = 0;
+        } else {
+          // Lys gult → lys rødt
+          const f = (t - 0.5) * 2; // 0→1
+          r = 255;
+          g = Math.round((1 - f) * 210);
+          b = 0;
+        }
+
+        d[i] = r;
+        d[i + 1] = g;
+        d[i + 2] = b;
+      }
+    }
+
+    const out = PNG.sync.write(png);
+    return new NextResponse(out as unknown as BodyInit, {
+      headers: {
+        "Content-Type": "image/png",
+        "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": "*",
+        "X-Debug": "v9-RdYlGn_r-boosted-GYR",
+      },
+    });
+  } catch (err) {
+    console.error("[havstrom v9] PNG-boost feilet:", err);
+    return new NextResponse(buffer as unknown as BodyInit, {
+      headers: {
+        "Content-Type": "image/png",
+        "Cache-Control": "no-store",
+        "X-Debug": "v9-fallback-raw-RdYlGn_r",
+      },
+    });
+  }
 }
