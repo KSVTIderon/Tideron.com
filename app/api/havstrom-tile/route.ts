@@ -64,14 +64,14 @@ export async function GET(req: NextRequest) {
   wmtsUrl.searchParams.set("version", "1.0.0");
   wmtsUrl.searchParams.set("request", "GetTile");
   wmtsUrl.searchParams.set("layer", "GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy-cur_anfc_0.083deg_P1M-m_202406/sea_water_velocity");
-  wmtsUrl.searchParams.set("style", "cmap:RdYlGn_r");
+  wmtsUrl.searchParams.set("style", "cmap:RdYlGn"); // 0=rød(sakte), 1=grønn(rask) — vi snur det server-side
   wmtsUrl.searchParams.set("format", "image/png");
   wmtsUrl.searchParams.set("tilematrixset", "EPSG:3857");
   wmtsUrl.searchParams.set("tilematrix", z);
   wmtsUrl.searchParams.set("tilerow", y);
   wmtsUrl.searchParams.set("tilecol", x);
   wmtsUrl.searchParams.set("time", time);
-  wmtsUrl.searchParams.set("colorscalerange", "0,1.0");
+  wmtsUrl.searchParams.set("colorscalerange", "0,0.5"); // 0-0.5 m/s passer månedlig gjennomsnitt
 
   let res: Response;
   try {
@@ -103,9 +103,10 @@ export async function GET(req: NextRequest) {
       if (d[i + 3] > 10) {
         const R = d[i], G = d[i + 1];
         // Estimer hastighet fra G/(R+G) forholdet
-        const ratio = G / (R + G + 1); // 1=sakte(grønn), 0=rask(rød)
-        const speed = 1 - ratio;        // 0=sakte, 1=rask
-        const t = Math.sqrt(speed);     // gamma 0.5 for bedre kontrast
+        // RdYlGn: sakte(0)=RØD (R dominerer), rask(1)=GRØNN (G dominerer)
+        // ratio=G/(R+G): lav=sakte(rød), høy=rask(grønn)
+        const ratio = G / (R + G + 1);
+        const t = ratio; // lineær: 0=sakte→grønt output, 1=rask→rødt output
 
         // Map t til lyse farger
         let r: number, g: number, b: number;
@@ -135,7 +136,7 @@ export async function GET(req: NextRequest) {
         "Content-Type": "image/png",
         "Cache-Control": "no-store",
         "Access-Control-Allow-Origin": "*",
-        "X-Debug": "v9-RdYlGn_r-boosted-GYR",
+        "X-Debug": "v10-RdYlGn-correct-direction-0.5ms",
       },
     });
   } catch (err) {
@@ -144,7 +145,7 @@ export async function GET(req: NextRequest) {
       headers: {
         "Content-Type": "image/png",
         "Cache-Control": "no-store",
-        "X-Debug": "v9-fallback-raw-RdYlGn_r",
+        "X-Debug": "v10-fallback-raw",
       },
     });
   }
