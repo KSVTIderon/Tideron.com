@@ -82,8 +82,8 @@ function BrregSok({
 }: {
   label: string;
   fieldNavn: keyof typeof BLANK_FORM;
-  fieldOrgNr: keyof typeof BLANK_FORM;
-  fieldAdresse: keyof typeof BLANK_FORM;
+  fieldOrgNr?: keyof typeof BLANK_FORM;
+  fieldAdresse?: keyof typeof BLANK_FORM;
   form: typeof BLANK_FORM;
   setForm: React.Dispatch<React.SetStateAction<typeof BLANK_FORM>>;
 }) {
@@ -104,9 +104,9 @@ function BrregSok({
   const velg = (e: BrregEnhet) => {
     setForm(f => ({
       ...f,
-      [fieldNavn]:    e.navn,
-      [fieldOrgNr]:   e.organisasjonsnummer,
-      [fieldAdresse]: brregAdresse(e),
+      [fieldNavn]: e.navn,
+      ...(fieldOrgNr   ? { [fieldOrgNr]:   e.organisasjonsnummer } : {}),
+      ...(fieldAdresse ? { [fieldAdresse]: brregAdresse(e) } : {}),
     }));
     setVis(false);
   };
@@ -155,7 +155,8 @@ export default function PPAPage({ params }: { params: { id: string } }) {
   const [lagreFeil, setLagreFeil] = useState<string | null>(null);
   const [sender, setSender] = useState(false);
   const [form, setForm] = useState({ ...BLANK_FORM });
-  const [editId, setEditId] = useState<string | null>(null); // ID of contract being edited
+  const [editId, setEditId] = useState<string | null>(null);
+  const [motpartSomKjoper, setMotpartSomKjoper] = useState(false);
   const [signerEpost, setSignerEpost] = useState("");
   const [signerNavn, setSignerNavn] = useState("");
   const [visSend, setVisSend] = useState<PPA | null>(null);
@@ -168,6 +169,13 @@ export default function PPAPage({ params }: { params: { id: string } }) {
   }, [params.id]);
 
   useEffect(() => { hent(); }, [hent]);
+
+  // Synce motpart automatisk fra kjøper når "Samme som kjøper" er huket av
+  useEffect(() => {
+    if (motpartSomKjoper && form.motpart !== form.kjoper_navn) {
+      setForm(f => ({ ...f, motpart: f.kjoper_navn }));
+    }
+  }, [form.kjoper_navn, motpartSomKjoper]);
 
   const hentTokens = async (contract_id: string) => {
     const { data } = await supabase.from("ppa_signing_tokens")
@@ -451,7 +459,27 @@ export default function PPAPage({ params }: { params: { id: string } }) {
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Grunnleggende</p>
               <div className="grid grid-cols-2 gap-3">
-                {inp("motpart", "Motpart / kjøpers navn", "text", "Statkraft AS")}
+                {/* Motpart med Brreg-søk og "Samme som kjøper"-toggle */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-slate-400 uppercase tracking-wider">Motpart (kortnavn i liste)</label>
+                    <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer select-none">
+                      <input type="checkbox" checked={motpartSomKjoper}
+                        onChange={e => {
+                          setMotpartSomKjoper(e.target.checked);
+                          if (e.target.checked) setForm(f => ({ ...f, motpart: f.kjoper_navn }));
+                        }}
+                        className="rounded" />
+                      Samme som kjøper
+                    </label>
+                  </div>
+                  {motpartSomKjoper ? (
+                    <input type="text" value={form.motpart} disabled
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-500" />
+                  ) : (
+                    <BrregSok label="" fieldNavn="motpart" form={form} setForm={setForm} />
+                  )}
+                </div>
                 {inp("pris_kr_kwh", "Pris (kr/kWh)", "number", "0.65")}
 
                 {/* Startdato med auto-sluttdato */}
@@ -544,7 +572,7 @@ export default function PPAPage({ params }: { params: { id: string } }) {
                   />
                 </div>
 
-                {inp("forventet_cod_dato", "Forventet COD-dato", "date")}
+                {inp("forventet_cod_dato", "Forventet COD-dato (kommersiell driftstart)", "date")}
                 {inp("avtalens_utlop_dato", "Avtalens utløpsdato", "date")}
               </div>
             </div>
